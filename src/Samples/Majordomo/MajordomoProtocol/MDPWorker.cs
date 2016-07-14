@@ -23,6 +23,7 @@ namespace MajordomoProtocol
         private int m_liveliness;                   // how many attempts are left
         private int m_expectReply;                  // will be 0 at start
         private NetMQFrame m_returnIdentity;        // the return identity if any
+        private NetMQFrame m_requestId;      
         private bool m_exit;                        // a flag for exiting the worker
         private bool m_connected;                   // a flag to signal whether worker is connected to broker or not
         private NetMQMessage m_request;             // used to collect the request received from the ReceiveReady event handler
@@ -126,6 +127,10 @@ namespace MajordomoProtocol
 
                 var message = Wrap (reply, m_returnIdentity);       // [client id][e][reply]
 
+                if (!ReferenceEquals(m_requestId, null))
+                {
+                    message.Append(m_requestId);
+                }
                 Send (MDPCommand.Reply, null, message);
             }
 
@@ -225,6 +230,15 @@ namespace MajordomoProtocol
                     // save as many addresses as there are until we hit an empty frame
                     // - for simplicity assume it is just one
                     m_returnIdentity = Unwrap (request);
+                    if (request.FrameCount == 2) // TODO Improve this definition!! Maybe use another request type!? RequestCorrelated
+                    {
+                        m_requestId = request.Last;
+                        request.RemoveFrame(m_requestId);
+                    }
+                    else
+                    {
+                        m_requestId = null;
+                    }
                     // set the class variable in order to return the request to caller
                     m_request = request;
                     break;

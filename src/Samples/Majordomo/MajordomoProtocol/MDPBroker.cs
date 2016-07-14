@@ -298,6 +298,7 @@ namespace MajordomoProtocol
         /// <summary>
         ///     expect from
         ///     CLIENT  ->  [sender adr][e][protocol header][service name][request]
+        ///     CLIENTASYNC -> [sender adr][e][protocol header][service name][request]
         ///     WORKER  ->  [sender adr][e][protocol header][mdp command][reply]
         /// </summary>
         private void ProcessReceivedMessage (object sender, NetMQSocketEventArgs e)
@@ -311,7 +312,7 @@ namespace MajordomoProtocol
             var headerFrame = msg.Pop ();               // [service or command][data]
             var header = headerFrame.ConvertToString ();
 
-            if (header == MDPConstants.MDP_CLIENT_HEADER)
+            if (header == MDPConstants.MDP_CLIENT_HEADER || header == MDPConstants.MDP_CLIENT_ASYNC_HEADER)
                 ProcessClientMessage (senderFrame, msg);
             else
                 if (header == MDPConstants.MDP_WORKER_HEADER)

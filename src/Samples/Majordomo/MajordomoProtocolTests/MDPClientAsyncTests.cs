@@ -17,9 +17,11 @@ namespace MajordomoTests
             var address = "tcp://localhost:5555";
             var session = new MDPClientAsync(address);
 
+            var timeout = TimeSpan.FromMilliseconds(5000);
+            session.Timeout = timeout;
             Assert.That(session, Is.Not.Null);
             Assert.That(session.Address, Is.EqualTo(address));
-            Assert.That(session.Timeout, Is.EqualTo(TimeSpan.FromMilliseconds(10000)));
+            Assert.That(session.Timeout, Is.EqualTo(timeout));
 
             session.Dispose();
         }
@@ -44,7 +46,7 @@ namespace MajordomoTests
             const string hostAddress = "tcp://localhost:5555";
             var loggingMessages = new List<string>();
             var serviceName = "echo";
-           
+
             using (var broker = new RouterSocket())
             using (var poller = new NetMQPoller())
             using (var session = new MDPClientAsync(hostAddress))
@@ -56,14 +58,20 @@ namespace MajordomoTests
                     var msg = e.Socket.ReceiveMultipartMessage();
                     // we expect to receive a 4 Frame message
                     // [client adrR][e][mdp header][service][request]
-                    if (msg.FrameCount != 5)
+                    if (msg.FrameCount != 6)
                         Assert.Fail("Message with wrong count of frames {0}", msg.FrameCount);
                     // REQUEST socket will strip the his address + empty frame
                     // ROUTER has to add the address prelude in order to identify the correct socket(!)
-                    // [client adr][e][mdp header][service][reply]
+                    // [client adr][e][mdp header][service][reply][requestId]
+
+                    var requestId = msg.Last.ConvertToString(); // get the requestId string
+                    msg.RemoveFrame(msg.Last); // remove the request frame
+
                     var request = msg.Last.ConvertToString(); // get the request string
                     msg.RemoveFrame(msg.Last); // remove the request frame
+
                     msg.Append(new NetMQFrame(request + " OK")); // append the reply frame
+                    msg.Append(requestId);
                     e.Socket.SendMultipartMessage(msg);
                 };
 
@@ -74,7 +82,7 @@ namespace MajordomoTests
 
                     Assert.That(reply.FrameCount, Is.EqualTo(1));
                     Assert.That(reply.First.ConvertToString(), Is.EqualTo("REQUEST OK"));
-    
+
                     poller.Stop();
                 };
                 int timeOutInMillis = 10000;
@@ -172,12 +180,13 @@ namespace MajordomoTests
                     // return empty reply
                     var msg = e.Socket.ReceiveMultipartMessage();
                     // we expect to receive a 4 Frame message
-                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"]
-                    if (msg.FrameCount != 5)
+                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"][requestId]
+                    if (msg.FrameCount != 6)
                         Assert.Fail("Message with wrong count of frames {0}", msg.FrameCount);
                     // REQUEST socket will strip the his address + empty frame
                     // ROUTER has to add the address prelude in order to identify the correct socket(!)
-                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"]
+                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"][requestId]
+
                     e.Socket.SendMultipartMessage(msg);
                 };
 
@@ -201,7 +210,7 @@ namespace MajordomoTests
 
                 int timeOutInMillis = 10000;
                 var timer = new NetMQTimer(timeOutInMillis); // Used so it doesn't block if something goes wrong!
-                timer.Elapsed += (s, e) => 
+                timer.Elapsed += (s, e) =>
                 {
                     Assert.Fail($"Waited {timeOutInMillis} and had no response from broker");
                     poller.Stop();
@@ -212,7 +221,7 @@ namespace MajordomoTests
             }
         }
 
-        [Test]
+        [Test] // TODO!
         public void SendWrongMDPVersionFromBrokerNoLoggingShouldThrowApplicationException()
         {
             const string hostAddress = "tcp://localhost:5555";
@@ -229,12 +238,12 @@ namespace MajordomoTests
                     // return empty reply
                     var msg = e.Socket.ReceiveMultipartMessage();
                     // we expect to receive a 4 Frame message
-                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"]
-                    if (msg.FrameCount != 5)
+                    // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"][requestId]
+                    if (msg.FrameCount != 6)
                         Assert.Fail("Message with wrong count of frames {0}", msg.FrameCount);
                     // REQUEST socket will strip the his address + empty frame
                     // ROUTER has to add the address prelude in order to identify the correct socket(!)
-                    // [REQ ADR][EMPTY]["MDPC00"]["echo"]["REQUEST"]
+                    // [REQ ADR][EMPTY]["MDPC00"]["echo"]["REQUEST"][requestId]
                     var clientAddress = msg.Pop();
                     msg.Pop(); // forget empty frame
                     msg.Pop(); // drop the MDP Version Frame
@@ -263,6 +272,13 @@ namespace MajordomoTests
                     poller.Stop(); // To unlock the Task.Wait()
                 };
 
+                session.FailedRequest += (s, e) =>
+                {
+                    Assert.True(e.HasError());
+                    Assert.That(e.Exception.Message, Is.StringContaining("MDP Version mismatch"));
+                    poller.Stop(); // To unlock the Task.Wait()
+                };
+
                 var task = Task.Factory.StartNew(() => poller.Run());
 
                 var requestMessage = new NetMQMessage(new[] { new NetMQFrame("REQUEST") });
@@ -272,7 +288,7 @@ namespace MajordomoTests
             }
         }
 
-        [Test]
+        [Test] // TODO!
         public void SendWrongHeaderFromBrokerNoLoggingShouldThrowApplicationException()
         {
             const string hostAddress = "tcp://localhost:5555";
@@ -290,11 +306,11 @@ namespace MajordomoTests
                     var msg = e.Socket.ReceiveMultipartMessage();
                     // we expect to receive a 4 Frame message
                     // [REQ ADR][EMPTY]["MDPC01"]["echo"]["REQUEST"]
-                    if (msg.FrameCount != 5)
+                    if (msg.FrameCount != 6)
                         Assert.Fail("Message with wrong count of frames {0}", msg.FrameCount);
                     // REQUEST socket will strip the his address + empty frame
                     // ROUTER has to add the address prelude in order to identify the correct socket(!)
-                    // [REQ ADR][EMPTY]["MDPC00"]["echo"]["REQUEST"]
+                    // [REQ ADR][EMPTY]["MDPC00"]["echo"]["REQUEST"][requestId]
                     var clientAddress = msg.Pop();
                     msg.Pop(); // forget empty frame
                     var mdpVersion = msg.Pop();
@@ -307,7 +323,7 @@ namespace MajordomoTests
                     e.Socket.SendMultipartMessage(msg);
                 };
 
-                int timeOutInMillis = 10000;
+                int timeOutInMillis = 25000;
                 var timer = new NetMQTimer(timeOutInMillis); // Used so it doesn't block if something goes wrong!
                 timer.Elapsed += (s, e) =>
                 {
@@ -319,6 +335,12 @@ namespace MajordomoTests
                 poller.Add(timer);
 
                 session.ReplyReady += (s, e) =>
+                {
+                    Assert.True(e.HasError());
+                    Assert.That(e.Exception.Message, Is.EqualTo("[CLIENT INFO] answered by wrong service: NoService"));
+                    poller.Stop(); // To unlock the Task.Wait()
+                };
+                session.FailedRequest += (s, e) =>
                 {
                     Assert.True(e.HasError());
                     Assert.That(e.Exception.Message, Is.EqualTo("[CLIENT INFO] answered by wrong service: NoService"));
@@ -347,7 +369,7 @@ namespace MajordomoTests
             using (var broker = new RouterSocket())
             using (var poller = new NetMQPoller())
             using (var session = new MDPClientAsync(hostAddress))
-            { 
+            {
                 session.Timeout = TimeSpan.FromMilliseconds(timeOutToReconnectInMillis);
                 broker.Bind(hostAddress);
                 broker.ReceiveReady += (s, e) =>
@@ -357,14 +379,19 @@ namespace MajordomoTests
                     {
                         // we expect to receive a 4 Frame message
                         // [client adrR][e][mdp header][service][request]
-                        if (msg.FrameCount != 5)
+                        if (msg.FrameCount != 6)
                             Assert.Fail("Message with wrong count of frames {0}", msg.FrameCount);
                         // REQUEST socket will strip the his address + empty frame
                         // ROUTER has to add the address prelude in order to identify the correct socket(!)
-                        // [client adr][e][mdp header][service][reply]
+
+                        var requestId = msg.Last.ConvertToString(); // get the requestId string
+                        msg.RemoveFrame(msg.Last); // remove the request frame
+
                         var request = msg.Last.ConvertToString(); // get the request string
                         msg.RemoveFrame(msg.Last); // remove the request frame
+
                         msg.Append(new NetMQFrame(request + " OK")); // append the reply frame
+                        msg.Append(requestId);
                         e.Socket.SendMultipartMessage(msg);
                     }
                     messagesReceivedOnBroker++;
@@ -377,7 +404,7 @@ namespace MajordomoTests
 
                     Assert.That(reply.FrameCount, Is.EqualTo(1));
                     Assert.That(reply.First.ConvertToString(), Is.EqualTo("REQUEST OK"));
- 
+
                     poller.Stop();
                 };
 
@@ -396,10 +423,54 @@ namespace MajordomoTests
 
                 session.Send(serviceName, requestMessage);
 
-                task.Wait();
+                var result = task.Wait(timeOutToReconnectInMillis * 2);
 
                 var numberOfConnects = loggingMessages.FindAll(x => x.Contains("[CLIENT] connecting to broker")).Count;
                 Assert.IsTrue(numberOfConnects > 1);
+            }
+        }
+
+        [Test]
+        public void ReceiveMessageFailedIfWasNotProcessed()
+        {
+            const string hostAddress = "tcp://localhost:5555";
+            var loggingMessages = new List<string>();
+            var serviceName = "echo";
+            Guid requestId = Guid.Empty;
+
+            using (var broker = new RouterSocket())
+            using (var poller = new NetMQPoller())
+            using (var session = new MDPClientAsync(hostAddress))
+            {
+                broker.Bind(hostAddress);
+                // we need to pick up any message in order to avoid errors
+                broker.ReceiveReady += (s, e) =>
+                {
+                    // doesn't reply to client
+                    var msg = e.Socket.ReceiveMultipartMessage();
+                };
+
+                session.LogInfoReady += (s, e) => loggingMessages.Add(e.Info);
+                session.ReplyReady += (s, e) =>
+                {
+                    Assert.IsTrue(false, "I'm not supposed to receive replies since broker is not sending them");
+                    poller.Stop();
+                };
+                session.FailedRequest += (s, e) =>
+                {
+                    Assert.That(requestId, Is.Not.EqualTo(Guid.Empty));
+                    Assert.That(e.RequestId, Is.EqualTo(requestId));
+                    poller.Stop();
+                };
+
+                poller.Add(broker);
+                var task = Task.Factory.StartNew(() => poller.Run());
+
+                var requestMessage = new NetMQMessage(new[] { new NetMQFrame("REQUEST") });
+
+                requestId = session.Send(serviceName, requestMessage);
+                var result = task.Wait(session.Timeout + session.Timeout);
+                Assert.IsTrue(result, $"During {session.Timeout}ms was not received a FailedReply");
             }
         }
     }

@@ -117,7 +117,7 @@ namespace MajordomoProtocol
         public void AddRequest (NetMQMessage message)
         {
             // add to the end, thus the oldest is the first element
-            m_pendingRequests.Add (message);
+            m_pendingRequests.Add (message); // TODO insert a limit where!? We can have memory overflow!
         }
 
         /// <summary>

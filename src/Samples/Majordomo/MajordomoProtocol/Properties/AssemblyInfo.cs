@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 // Attribute gesteuert. Ändern Sie diese Attributwerte, um die Informationen zu ändern,
 // die mit einer Assembly verknüpft sind.
 [assembly: AssemblyTitle ("Majordomo")]
-[assembly: AssemblyDescription ("")]
+[assembly: AssemblyDescription("Library the enables messaging with Majordomo pattern")]
 [assembly: AssemblyConfiguration ("")]
-[assembly: AssemblyCompany ("")]
+[assembly: AssemblyCompany("NetMQ")]
 [assembly: AssemblyProduct ("Majordomo")]
 [assembly: AssemblyCopyright ("Copyright ©  2015")]
 [assembly: AssemblyTrademark ("")]
@@ -34,5 +34,6 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion ("0.3.15052.111")]
 [assembly: AssemblyFileVersion ("0.3.15052.111")]
+[assembly: AssemblyInformationalVersion("0.4.1.5")]
 
 [assembly: InternalsVisibleTo ("MajordomoTests")]

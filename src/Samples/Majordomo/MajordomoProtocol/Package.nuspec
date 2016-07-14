@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+   <metadata>
+      <id>$id$</id>
+      <version>$version$</version>
+      <title>$title$</title>
+      <authors>$author$</authors>
+      <requireLicenseAcceptance>false</requireLicenseAcceptance>
+      <description>$description$</description>
+   </metadata>
+   <files>
+           <file src="$outdir$$id$.*"
+                 target="lib/net451" />
+           <file src="$outdir$NetMQ.*"
+                 target="lib/net451" />
+           <file src="$outdir$MDPCommons.*"
+                 target="lib/net451" />
+   </files>
+</package>

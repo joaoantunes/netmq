@@ -26,12 +26,14 @@ namespace MDPCommons
         /// </summary>
         /// <param name="serviceName">the name of the service requested</param>
         /// <param name="request">the request message to process by service</param>
-        void Send (string serviceName, NetMQMessage request);
+        Guid Send (string serviceName, NetMQMessage request, SendOptions options = null);
 
         /// <summary>
         ///  reply to an asyncronous request
         /// </summary>
         event EventHandler<MDPReplyEventArgs> ReplyReady;
+
+        event EventHandler<MDPFailedRequestEventArgs> FailedRequest;
 
         /// <summary>
         ///     broadcast logging info via this event

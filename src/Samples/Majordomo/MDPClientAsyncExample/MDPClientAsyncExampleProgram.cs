@@ -31,7 +31,7 @@ namespace MDPClientExample
             const int max_runs = 100000;
 
             bool verbose = false;
-            int runs = 10;
+            int runs = 10000;
 
             if (args.Length >= 1)
             {
@@ -67,7 +67,8 @@ namespace MDPClientExample
                     if (verbose)
                         session.LogInfoReady += (s, e) => Console.WriteLine("{0}", e.Info);
 
-                    session.ReplyReady += (s, e) => Console.WriteLine("{0}", e.Reply);
+                    session.ReplyReady += (s, e) => Console.WriteLine("SENT WITH SUCESS {0}", e.Reply);
+                    session.FailedRequest += (s, e) => Console.WriteLine("FAILED {0}", e.Reply);
 
                     // just give everything time to settle in
                     Thread.Sleep(500);
