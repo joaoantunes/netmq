@@ -312,7 +312,7 @@ namespace MajordomoProtocol
             var headerFrame = msg.Pop ();               // [service or command][data]
             var header = headerFrame.ConvertToString ();
 
-            if (header == MDPConstants.MDP_CLIENT_HEADER || header == MDPConstants.MDP_CLIENT_ASYNC_HEADER)
+            if (header == MDPConstants.MDP_CLIENT_HEADER)
                 ProcessClientMessage (senderFrame, msg);
             else
                 if (header == MDPConstants.MDP_WORKER_HEADER)

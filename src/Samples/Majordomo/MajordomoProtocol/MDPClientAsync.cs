@@ -16,12 +16,13 @@ namespace MajordomoProtocol
     public class MDPClientAsync : IMDPClientAsync
     {
         private readonly TimeSpan m_defaultTimeOutPerRequest = TimeSpan.FromSeconds(30);
-        private readonly TimeSpan m_defaultTimeOut = TimeSpan.FromMilliseconds(20000); // default value to be used to know if broker is not responding
+        private readonly TimeSpan m_defaultTimeOut = TimeSpan.FromMilliseconds(15000); // default value to be used to know if broker is not responding
         private readonly TimeSpan m_lingerTime = TimeSpan.FromMilliseconds(1);
         private readonly string m_mdpClient = MDPConstants.MDP_CLIENT_HEADER; //MDPConstants.MDP_CLIENT_ASYNC_HEADER;
 
         private NetMQSocket m_client;           // the socket to communicate with the broker
         private NetMQPoller m_poller;           // used to poll asynchronously the replies and possible timeouts
+        private NetMQQueue<Action> m_pollerQueue;
 
         private readonly string[] m_brokerAddresses;
         private int m_currentBrokerIndex;
@@ -35,7 +36,7 @@ namespace MajordomoProtocol
 
         private RequestsQueue m_requestQueue;
 
-        private TimeSpan m_purgeCheckTime = TimeSpan.FromMilliseconds(30000);
+        private TimeSpan m_purgeCheckTime = TimeSpan.FromMilliseconds(1000);
 
         /// <summary>
         ///     returns the address of the broker the client is connected to
@@ -75,6 +76,10 @@ namespace MajordomoProtocol
             m_client = null;
             m_connected = false;
             m_currentBrokerIndex = -1; // TODO use random!?
+
+            m_pollerQueue = new NetMQQueue<Action>();
+            m_pollerQueue.ReceiveReady += (sender, args) => OnAction(args);
+
             m_requestQueue = new RequestsQueue();
             m_requestQueue.FailedRequest += (s, e) => OnFailedRequest(e);
 
@@ -85,6 +90,7 @@ namespace MajordomoProtocol
             m_timer.Enable = false;
             m_timer.Elapsed += (s, e) => OnPurgeRequest();
             m_poller.Add(m_timer);
+            m_poller.Add(m_pollerQueue);
 
             m_poller.Add(m_timer);
             m_poller.RunAsync();
@@ -190,11 +196,11 @@ namespace MajordomoProtocol
             if (!disposing)
                 return;
 
-            if (!ReferenceEquals(m_poller, null))
-                m_poller.Dispose();
-
             if (!ReferenceEquals(m_client, null))
                 m_client.Dispose();
+
+            if (!ReferenceEquals(m_poller, null))
+                m_poller.Dispose();
         }
 
         /// <summary>
@@ -206,8 +212,10 @@ namespace MajordomoProtocol
         {
             if (!ReferenceEquals(m_client, null))
             {
+                m_client.ReceiveReady -= OnReceiveReady;
+                m_client.SendReady -= OnSendReady;
                 m_poller.Remove(m_client);
-                m_client.Dispose(); // !? isto pode dar problemas!? por não estar no mm thread que o Poller!?
+                m_pollerQueue.Enqueue(() => DisposeClient(m_client));
             }
 
             m_client = new DealerSocket();
@@ -341,7 +349,7 @@ namespace MajordomoProtocol
 
         private void OnPurgeRequest()
         {
-            Log($"[CLIENT INFO] Going to purge requests");
+            //Log($"[CLIENT INFO] Going to purge requests");
             m_requestQueue.PurgeRequests();
 
             if (IsReconnectRequired())
@@ -370,6 +378,17 @@ namespace MajordomoProtocol
                     m_currentBrokerIndex = 0;
                 }
             }
+        }
+
+        private void OnAction(NetMQQueueEventArgs<Action> args)
+        {
+            var action = args.Queue.Dequeue();
+            action.Invoke();
+        }
+
+        private void DisposeClient(NetMQSocket client)
+        {
+            client.Dispose();
         }
 
         /// <summary>

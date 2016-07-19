@@ -17,21 +17,25 @@ namespace MDPCommons
         /// </summary>
         TimeSpan ReconnectDelay { get; set; }
 
+        void SendAck(NetMQMessage reply);
+
+        event EventHandler<NetMQMessage> Work;
+
         /// <summary>
         ///     broadcast logging information via this event
         /// </summary>
         event EventHandler<MDPLogEventArgs> LogInfoReady;
 
-        /// <summary>
-        ///      sends it's reply and waits for a new request
-        /// </summary>
-        /// <param name="reply">reply to the received request</param>
-        /// <returns>a request</returns>
-        /// <remarks>
-        ///      upon connection the first receive a worker does, he must
-        ///      pass a <c>null</c> reply in order to initiate the REQ-REP
-        ///      ping-pong
-        /// </remarks>
-        NetMQMessage Receive(NetMQMessage reply);
+        ///// <summary>
+        /////      sends it's reply and waits for a new request
+        ///// </summary>
+        ///// <param name="reply">reply to the received request</param>
+        ///// <returns>a request</returns>
+        ///// <remarks>
+        /////      upon connection the first receive a worker does, he must
+        /////      pass a <c>null</c> reply in order to initiate the REQ-REP
+        /////      ping-pong
+        ///// </remarks>
+        //NetMQMessage Receive(NetMQMessage reply);
     }
 }
