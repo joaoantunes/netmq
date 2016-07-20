@@ -197,7 +197,15 @@ namespace MajordomoProtocol
                 return;
 
             if (!ReferenceEquals(m_client, null))
-                m_client.Dispose();
+            {
+                DisposeClient();
+            }
+
+            if (!ReferenceEquals(m_pollerQueue, null))
+            {
+                m_poller.Remove(m_pollerQueue);
+                m_pollerQueue.Dispose();
+            }
 
             if (!ReferenceEquals(m_poller, null))
                 m_poller.Dispose();
@@ -212,10 +220,7 @@ namespace MajordomoProtocol
         {
             if (!ReferenceEquals(m_client, null))
             {
-                m_client.ReceiveReady -= OnReceiveReady;
-                m_client.SendReady -= OnSendReady;
-                m_poller.Remove(m_client);
-                m_pollerQueue.Enqueue(() => DisposeClient(m_client));
+                DisposeClient();
             }
 
             m_client = new DealerSocket();
@@ -386,9 +391,13 @@ namespace MajordomoProtocol
             action.Invoke();
         }
 
-        private void DisposeClient(NetMQSocket client)
+        private void DisposeClient()
         {
-            client.Dispose();
+            var old = m_client;
+            old.ReceiveReady -= OnReceiveReady;
+            old.SendReady -= OnSendReady;
+            m_poller.Remove(old);
+            m_pollerQueue.Enqueue(() => old.Dispose());
         }
 
         /// <summary>

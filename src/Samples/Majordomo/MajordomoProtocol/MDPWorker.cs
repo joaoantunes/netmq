@@ -258,9 +258,7 @@ namespace MajordomoProtocol
             // if the socket exists dispose it and re-create one
             if (!ReferenceEquals(m_worker, null))
             {
-                m_worker.ReceiveReady -= ProcessReceiveReady;
-                m_poller.Remove(m_worker);
-                m_pollerQueue.Enqueue(() => DisposeWorker(m_worker));
+                DisposeWorker();
             }
 
             m_worker = new DealerSocket();
@@ -287,9 +285,12 @@ namespace MajordomoProtocol
             m_heartbeatAt = DateTime.UtcNow + HeartbeatDelay;
         }
 
-        private void DisposeWorker(NetMQSocket worker)
+        private void DisposeWorker()
         {
-            worker.Dispose();
+            var old = m_worker;
+            old.ReceiveReady -= ProcessReceiveReady;
+            m_poller.Remove(old);
+            m_pollerQueue.Enqueue(() => old.Dispose());
         }
 
         private async void OnHeartbeat()
@@ -414,8 +415,7 @@ namespace MajordomoProtocol
 
             if (!ReferenceEquals(m_worker, null))
             {
-                m_poller.Remove(m_worker);
-                m_worker.Dispose();
+                DisposeWorker();
             }
 
             if (!ReferenceEquals(m_pollerQueue, null))
