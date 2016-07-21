@@ -354,14 +354,13 @@ namespace MajordomoProtocol
 
         private void OnPurgeRequest()
         {
-            //Log($"[CLIENT INFO] Going to purge requests");
-            m_requestQueue.PurgeRequests();
-
             if (IsReconnectRequired())
             {
                 Log($"[CLIENT INFO] No message received from broker during {Timeout} time");
                 Connect();
             }
+            Log($"[CLIENT INFO] Going to purge requests");
+            m_requestQueue.PurgeRequests();
         }
 
         private bool IsReconnectRequired()
